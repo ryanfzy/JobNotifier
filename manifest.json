@@ -1,0 +1,30 @@
+{
+	"manifest_version": 2,
+	"name": "job notifier",
+	"version": "0.1",
+	"description": "job notifier",
+	"browser_action": {
+		"default_title": "Job Notifier",
+		"default_popup": "index.html"
+	},
+    "background": {
+        "scripts": [
+            "constants.js",
+            "lib/common.js",
+            "lib/parser.js",
+            "lib/urlloader.js",
+            "jobscontroller.js",
+            "backwork.js"
+        ]
+    },
+    "web_accessible_resources": [
+        "images/mercyascotlogo.gif"
+    ],
+	"permissions": [
+        "webRequest",
+		"tabs",
+		"storage",
+		"http://*/*",
+		"https://*/*"
+	]
+}

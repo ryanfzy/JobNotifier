@@ -1,0 +1,25 @@
+<table id="jobsTable" border="1">
+    <tr ng-repeat="job in jobs">
+        <td>
+            <div id="jobDescriptionHead">
+                <img id="logo" ng-src="{{job.img}}" />
+                <a id="jobTitle" href="#" ng-click="openUrl(job)">{{job.title}}</a>
+                <span ng-if="job.isNew" class="newJob">NEW</span><br/>
+            </div>
+            <div id="jobDescriptionBody">
+                <b>Location:</b> {{job.location | NullFilter}}<br/>
+                <b>Expertise:</b> {{job.expertise | NullFilter}}<br/>
+                <b>Work Type:</b> {{job.workType | NullFilter}}<br/>
+                <b>Level:</b> {{job.level | NullFilter}}<br/>
+                <b>Posted Date:</b> {{job.postedDate | NullFilter}}<br/>
+                <b>Close Date:</b> {{job.closeDate | NullFilter}}<br/>
+            </div>
+
+            <div id="jobDescriptionButton">
+                <button ng-if="job.isFollowed" ng-click="unFollowJob(job)">UnFollow</button>
+                <button ng-if="job.isFollowed == false" ng-click="followJob(job)">Follow</button>
+                <button ng-click="showJson(job)">Show Json</button>
+            </div>
+        </td>
+    </tr>
+</table>

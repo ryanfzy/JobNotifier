@@ -1,0 +1,19 @@
+<hr/>
+<button ng-click="deleteAllJobs()">Delete All</button>
+<table id="databaseTable" border="1">
+    <tr class="header">
+        <td></td>
+        <td ng-repeat="key in dataKeys">
+            {{key}}
+            <button ng-click="deleteColumn()">Delete</button>
+        </td>
+    </tr>
+    <tr ng-repeat="dataItem in dataValues">
+        <td>
+            <button ng-click="deleteRow()">Delete</button>
+        </td>
+        <td ng-repeat="item in dataItem">
+            <div>{{item.value | TextLengthFilter}}</div>
+        </td>
+    </tr>
+</table>

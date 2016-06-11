@@ -1,0 +1,26 @@
+<html ng-app="JobNotifier">
+    <head>
+        <link rel="stylesheet" type="text/css" href="style.css"/>
+        <script src="constants.js"></script>
+        <script src="lib/angular.min.js"></script>
+        <script src="lib/common.js"></script>
+        <script src="jobscontroller.js"></script>
+        <script src="frontwork.js"></script>
+        <title></title>
+    </head>
+    <body>
+        <h3>New Jobs</h3>
+        <div ng-controller="MainController">
+            <div>
+                <!-- control panel -->
+                <button ng-click="showNewJobs(false)">New Jobs</button>
+                <button ng-click="showNewJobs(true)">My Follows</button>
+                <button ng-click="viewDatabase()">Data Base</button>
+            </div>
+            <div ng-switch on="currentPanel">
+                <div panel ng-switch-when="newjobs" type="newjobs"></div>
+                <div panel ng-switch-when="database" type="database"></div>
+            </div>
+        </div>
+    </body>
+</html>

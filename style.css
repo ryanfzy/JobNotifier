@@ -1,0 +1,35 @@
+
+.newJob{
+    background-color: red;
+    color: white;
+}
+
+#databaseTable .header{
+    font-weight: bold;
+}
+
+#databaseTable td{
+    vertical-align: top;
+}
+
+#databaseTable td div{
+    width: 150px;
+    overflow: hidden;
+}
+
+#jobsTable{
+    width: 500px;
+}
+
+#logo{
+    height: 40px;
+    float: left;
+    margin-right: 5px;
+}
+
+#jobTitle{
+}
+
+#jobDescriptionBody{
+    clear: both;
+}
