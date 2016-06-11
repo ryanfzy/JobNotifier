@@ -45,11 +45,17 @@ var addProperties = function(obj, propertyNames, propertyValues, defaultValue){
 var DATA_VERSION = '1';
 
 // compare functon should return one of of following result
+// TODO: this might not be useful
 var CompareResult = {};
 CompareResult.Equal = 0;
 CompareResult.NotEqual = 1;
 CompareResult.EqualWithHigherVersion = 2;
 CompareResult.EqualWithLowerVersion = 3;
+
+var Status = {};
+Status.New = 0;
+Status.Old = 1;
+Status.Updated = 2;
 
 // job sources
 var MERCYASCOT = 'mercyascot';
@@ -67,8 +73,9 @@ var POSTEDDATE = 'postedDate';
 var CLOSEDATE = 'closeDate';
 var UPDATEDDATE = 'updatedDate';
 var SOURCE = 'source';
-var DATAVERSION = 'dataVersion';
-var USERDATA = 'userData';
+//var DATAVERSION = 'dataVersion';
+//var USERDATA = 'userData';
+var STATUS = 'status';
 
 // user data keys
 var ISFOLLOWED = 'isFollowed';
@@ -78,9 +85,11 @@ var gJobs = {};
 var gJobCmpFuncs = {};
 var gNumOfNewJobs = 0;
 var gUrls = {};
+var loader = new UrlLoader();
 
 var supportedSources = [MERCYASCOT, ADHB];
 
+// TODO: this might not be useful
 var CreateNewUserData = function(){
     var userData = {};
     userData[ISFOLLOWED] = false;
@@ -99,124 +108,103 @@ var CreateNewJob = function(){
     newJob[LEVEL] = "";
     newJob[POSTEDDATE] = "";
     newJob[CLOSEDATE] = "";
-    //newJob[ISFOLLOWED] = false;
     newJob[UPDATEDDATE] = (new Date()).toDateString();
     newJob[SOURCE] = "";
-    newJob[DATAVERSION] = DATA_VERSION;
+    //newJob[DATAVERSION] = DATA_VERSION;
 
-    newJob[USERDATA] = CreateNewUserData();
-
-    return newJob;
-}
-
-// create a new job object
-// TODO: this function should only update the job
-var UpdateOldJob = function(jobPart){
-    var newJob = {};
-
-    newJob[HREF] = jobPart[HREF] || "";
-    newJob[TITLE] = jobPart[TITLE] || "";
-    newJob[DESCRIPTION] = jobPart[DESCRIPTION] || "";
-    newJob[LOCATION] = jobPart[LOCATION] || "";
-    newJob[EXPERTISE] = jobPart[EXPERTISE] || "";
-    newJob[WORKTYPE] = jobPart[WORKTYPE] || "";
-    newJob[LEVEL] = jobPart[LEVEL] || "";
-    newJob[POSTEDDATE] = jobPart[POSTEDDATE] || "";
-    newJob[CLOSEDATE] = jobPart[CLOSEDATE] || "";
-    //newJob[ISFOLLOWED] = jobPart[ISFOLLOWED] || false;
-    newJob[UPDATEDDATE] = jobPart[UPDATEDDATE] || (new Date()).toDateString();
-    newJob[SOURCE] = jobPart[SOURCE] || "";
-    newJob[DATAVERSION] = jobPart[DATAVERSION] || "0";
-
-    newJob[USERDATA] = jobPart[USERDATA] || CreateNewUserData();
+    newJob[ISFOLLOWED] = false;
+    newJob[STATUS] = Status.New;
 
     return newJob;
 }
 
-// return all the jobs including old ones and new ones
+var AreTwoJobsSameForAttributes = function(job1, job2, attributes){
+    for (var i = 0; i < attributes.length; i++){
+        var attribute = attributes[i];
+        if (job1[attribute] != job2[attribute]){
+            return false;
+        }
+    }
+    return true;
+};
+
+// this function update the job
+var UpdateJob = function(oldJob, newJob){
+    //var job = CreateNewJob();
+
+    var attributes = [HREF, TITLE, DESCRIPTION, LOCATION, EXPERTISE, WORKTYPE, LEVEL,
+        POSTEDDATE, CLOSEDATE, SOURCE];
+
+    if (!AreTwoJobsSameForAttributes(oldJob, newJob, attributes)){
+        oldJob[HREF] = newJob[HREF];
+        oldJob[TITLE] = newJob[TITLE];
+        oldJob[DESCRIPTION] = newJob[DESCRIPTION];
+        oldJob[LOCATION] = newJob[LOCATION];
+        oldJob[EXPERTISE] = newJob[EXPERTISE];
+        oldJob[WORKTYPE] = newJob[WORKTYPE];
+        oldJob[LEVEL] = newJob[LEVEL];
+        oldJob[POSTEDDATE] = newJob[POSTEDDATE];
+        oldJob[CLOSEDATE] = newJob[CLOSEDATE];
+        oldJob[SOURCE] = newJob[SOURCE];
+        //job[DATAVERSION] = newJob[DATAVERSION];
+        oldJob[STATUS] = Status.Updated;
+
+        oldJob[UPDATEDDATE] = newJob[UPDATEDDATE];
+    }
+    else
+        oldJob[STATUS] = Status.Old;
+
+    // don't update isFollowed field
+    //oldJob[ISFOLLOWED] = newJob[ISFOLLOWED];
+
+    return job;
+}
+
+// update old jobs and add new jobs
+// jobs from old jobs that are no longer exist will be removed unless it is followed
 var GetUpdatedJobs = function(title, newJobs, oldJobs){
+    // get the corresponding compare function
     var cmpfunc = gJobCmpFuncs[title];
     var jobs = [];
-    //var allJobs = [];
-
-    //var indexesOfOldJobsToRemove = [];
-    //var updatedOldJobs = [];
-    //commonjs.forEach(oldJobs, function(oldJob){
-        //updatedOldJobs.push(UpdateOldJob(oldJobs));
-    //});
 
     // get new jobs
     commonjs.forEach(newJobs, function(newJob){
-        if (!commonjs.anyTrue(oldJobs, newJob, cmpfunc)){
-            jobs.push(newJob);
-            gNumOfNewJobs++;
-        }
-        /*
-        var result = CompareResult.NotEqual;
-        commonjs.forEach(oldJobs, function(oldJob, index, ret){
-           oldJob = UpdateOldJob(oldJob);
-           var result = cmpfunc(oldJob, newJob);
-           switch (result){
-           case CompareResult.Equal:
-               result = CompareResult.Equal;
-               ret.break = true;
-               break;
-           case CompareResult.EqualWithHigherVersion:
-               allJobs.push(newJob);
-               break;
-           case CompareResult.EqualWithLowerVersion:
-               allJobs.push(oldJob);
-               break;
-           default:
-               break;
-           }
-           result.break = true;
-       }); 
-       */
+        var jobToAdd = newJob;
+        // if we find the same job in old jobs, update the job
+        commonjs.forEachTrue(oldJobs, newJob, cmpfunc, function(oldJob){
+            jobToAdd = UpdateJob(oldJob, newJob);
+        });
+        // if we can't find the same job, add the new job
+        jobs.push(newJob);
     });
 
-    // append new jobs to old jobs
-    //jobs = oldJobs.concat(jobs);
     return jobs;
 };
 
+// save the new jobs to local storage
 var SaveNewJobsToLocal = function(){
 
     Assert(Object.keys(gJobs).length == supportedSources.length, 'ERROR: SaveNewJobsToLocal() gJobs and supportedSources should have same number of items');
 
     var titles = Object.keys(gJobs);
-    // change the function name from getData to getDataForEach
+
     jobscontrollerjs.getDataForEach(titles, function(oldJobs, title){
         //console.log('old jobs');
         //console.log(oldJobs);
+
+        // update old jobs and add new jobs
         gJobs[title] = GetUpdatedJobs(title, gJobs[title], oldJobs);
+
         console.log('new jobs');
         console.log(gJobs[title]);
 
-        // bad name
         jobscontrollerjs.setData(title, gJobs[title]);
     });
-    // bad name
+
     jobscontrollerjs.saveDataWhenReady();
 };
 
-// add some more info to a job object
-/*
-var addMoreInfo = function(job){
-    var today = new Date();
-    job[UPDATEDDATE] = today.toDateString();
-    job[ISFOLLOWED] = false;
-    return job;
-};*/
-
 var SaveNewJobs = function(title, jobs, cmpfunc){
-    // add some more info to each job
-    /*
-    for (var i = 0; i < jobs.length; i++){
-        //jobs[i] = addMoreInfo(jobs[i]);
-        jobs[i] = createNewJob(jobs[i]);
-    }*/
-
     gJobs[title] = jobs;
     gJobCmpFuncs[title] = cmpfunc;
     
@@ -280,23 +268,9 @@ var mercyascotCmpFunc = function(item1, item2){
         var propName = properties[i];
         if (item1[propName] != item2[propName]){
             return false;
-            //return CompareResult.NotEqual;
         }
     }
     return true;
-
-    /*
-    // item1 and item2 are the same job, but they have different data version number
-    if (item1[DATAVERSION] > item2[DATAVERSION]){
-        return CompareResult.EqualWithLowerVersion;
-    }
-    else if (item1[DATAVERSION] < item2[DATAVERSION]){
-        return CompareResult.EqualWithHigherVersion;
-    }
-
-    // item1 and item2 are the same job with same data version number
-    return CompareResult.Equal;
-    */
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -394,7 +368,6 @@ var adhbCmpFunc = function(item1, item2){
 var FetchNewJobsFromSources = function(){
 	
 	// thread issue with chrome.storage
-	var loader = new UrlLoader();
 	loader.load(gUrls[MERCYASCOT], function(text){
 	
 	    Assert(text.length > 0, 'ERROR: load for mercyasoct url return empty string');
@@ -438,13 +411,9 @@ var FetchNewJobsFromSources = function(){
 	});
 }
 
-jobscontrollerjs.loadData(function(){
-    if (jobscontrollerjs.getMetaData(DATAVERSION) < DATA_VERSION){
-        UpgradeOldData(jobscontrollerjs.getAllJobs());
-    }
-    FetchNewJobs();
-});
+//jobscontrollerjs.deleteAll();
 
+FetchNewJobsFromSources();
 
 //////////////////////////////////////////////////////////////////////////
 
