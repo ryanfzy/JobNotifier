@@ -1,10 +1,16 @@
 <table id="jobsTable" border="1">
-    <tr ng-repeat="job in jobs">
+    <!-- we track each job by its href link, otherwise angularjs will add $$hashkey to each job which somehow will be stored in the database and give duplicate hash key error -->
+    <!-- we need to find out why this happens -->
+    <tr class="repeated-item" ng-repeat="job in jobs track by job.href">
         <td>
             <div id="jobDescriptionHead">
                 <img id="logo" ng-src="{{job.img}}" />
                 <a id="jobTitle" href="#" ng-click="openUrl(job)">{{job.title}}</a>
-                <span ng-if="job.isNew" class="newJob">NEW</span><br/>
+                <img id="jobStatusLogo" ng-if="job.isNew" ng-src="images/open-logo.png" />
+                <img id="jobStatusLogo" ng-if="job.isUpdated" ng-src="images/update-logo.png" />
+                <img id="jobStatusLogo" ng-if="job.isClosed" ng-src="images/close-logo.png" />
+                <!--span ng-if="job.isNew" class="newJob">NEW<br/></span>
+                <span ng-if="job.isUpdated" class="updatedJob">UPDATED<br/></span-->
             </div>
             <div id="jobDescriptionBody">
                 <b>Location:</b> {{job.location | NullFilter}}<br/>

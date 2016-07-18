@@ -3,7 +3,7 @@
 */
 var totalJobs = {};
 
-var dataNames = [MERCYASCOT, ADHB];
+var dataNames = [MERCYASCOT, ADHB, WDHB];
 
 var convertJobs = function(jobs){
     var convertedJobs = [];
@@ -34,7 +34,7 @@ var removeJob = function(category, index){
     saveJobs(category, totalJobs[category]);
 };
 
-var jobModule = angular.module('JobNotifier', []);
+var jobModule = angular.module('JobNotifier', ['ngAnimate']);
 
 // to load images to chrome extension, we must add the protocol 'chrome-extension'
 // to the white list
@@ -135,36 +135,23 @@ jobModule.controller('MainController', ['$scope', function($scope){
         jobscontrollerjs.deleteAll();
     };
 
+    $scope.viewUpdates = function(){
+        $scope.currentPanel = 'updates';
+    };
+
     /////////////////////////////////////////////////////////////////////////////
 
     jobscontrollerjs.getDataForEach(dataNames, function(jobs, name){
         var subTotalJobs = [];
         commonjs.forEach(jobs, function(job, index){
-            var updatedDate = new Date(job.updatedDate);
-            var today = new Date();
-
-            job.isNew = (updatedDate.getMonth() == today.getMonth() && updatedDate.getDate() == today.getDate());
+            job.isNew = job[STATUS] == JobStatus.New;
+            job.isUpdated = job[STATUS] == JobStatus.Updated;
+            job.isClosed = job[STATUS] == JobStatus.Closed;
             job.category = name;
             job.index = index;
 
             subTotalJobs.push(job);
         });
-        /*
-        for (var j = 0; j < jobs.length; j++){
-            var job = jobs[j];
-    
-            // check if a job is a new job
-            var updatedDate = new Date(job.updatedDate);
-            var today = new Date();
-            job.isNew = (updatedDate.getMonth() == today.getMonth() && updatedDate.getDate() == today.getDate());
-            job.category = name;
-            job.index = j;
-
-            //job.isFollowed = job.isFollowed || false;
-
-            subTotalJobs.push(job);
-        }
-        */
 
         // this is essential, otherwise some jobs will not show on the page
         totalJobs[name] = subTotalJobs;
@@ -176,7 +163,10 @@ jobModule.controller('MainController', ['$scope', function($scope){
     });
 
     $scope.openUrl = function(job){
-        chrome.tabs.create({url:job.href});
+        var top = document.body.scrollTop;
+        chrome.tabs.create({url:job.href, active:false, index:0}, function(tab){
+            document.body.scrollTop = top;
+        });
     };
 
     $scope.followJob = function(job){
@@ -232,6 +222,9 @@ jobModule.directive('panel', function(){
             }
             else if (attr.type == 'newjobs'){
                 return 'jobview.html';
+            }
+            else if (attr.type == 'updates'){
+                return 'updates.html';
             }
         }
     }

@@ -1,8 +1,11 @@
 {
 	"manifest_version": 2,
 	"name": "job notifier",
-	"version": "0.1",
+	"version": "0.2",
 	"description": "job notifier",
+    "icons": {
+        "16": "images/icon-bold.png"
+    },
 	"browser_action": {
 		"default_title": "Job Notifier",
 		"default_popup": "index.html"

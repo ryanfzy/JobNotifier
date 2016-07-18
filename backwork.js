@@ -15,70 +15,11 @@ var decode = function(data){
     return res;
 };
 
-var alertJson = function(data){
-    alert(JSON.stringify(data, null, 4));
-};
-
-var alertEx = function(data){
-    var titles = ""; 
-    for (var i = 0; i < data.length; i++){
-        titles += (data[i]['title'] + ';');
-    }
-    alert(titles);
-};
-
-var addProperties = function(obj, propertyNames, propertyValues, defaultValue){
-    for (var i = 0; i < propertyNames.length; i++){
-        var name = propertyNames[i];
-        var value = defaultValue;
-        if (propertyValues.length > i){
-            value = propertyValues[i];
-        }
-        obj[name] = value;
-    }
-    return obj;
-};
-
 //////////////////////////////////////////////////////////////////////////
 
-// every time we chage the data structure, increase the version number by 1
-var DATA_VERSION = '1';
-
-// compare functon should return one of of following result
-// TODO: this might not be useful
-var CompareResult = {};
-CompareResult.Equal = 0;
-CompareResult.NotEqual = 1;
-CompareResult.EqualWithHigherVersion = 2;
-CompareResult.EqualWithLowerVersion = 3;
-
-var Status = {};
-Status.New = 0;
-Status.Old = 1;
-Status.Updated = 2;
-
-// job sources
-var MERCYASCOT = 'mercyascot';
-var ADHB = 'adhb';
-
-// job data keys
-var HREF = 'href';
-var TITLE = 'title';
-var DESCRIPTION = 'description';
-var LOCATION = 'location';
-var EXPERTISE = 'expertise';
-var WORKTYPE = 'workType';
-var LEVEL = 'level';
-var POSTEDDATE = 'postedDate';
-var CLOSEDATE = 'closeDate';
-var UPDATEDDATE = 'updatedDate';
-var SOURCE = 'source';
-//var DATAVERSION = 'dataVersion';
-//var USERDATA = 'userData';
-var STATUS = 'status';
-
-// user data keys
-var ISFOLLOWED = 'isFollowed';
+/*
+   go to constants.js to see the data structure defintion for jobs
+*/
 
 // global variables
 var gJobs = {};
@@ -87,13 +28,7 @@ var gNumOfNewJobs = 0;
 var gUrls = {};
 var loader = new UrlLoader();
 
-var supportedSources = [MERCYASCOT, ADHB];
-
-// TODO: this might not be useful
-var CreateNewUserData = function(){
-    var userData = {};
-    userData[ISFOLLOWED] = false;
-}
+var supportedSources = [MERCYASCOT, ADHB, WDHB];
 
 // this create a new job
 var CreateNewJob = function(){
@@ -113,7 +48,7 @@ var CreateNewJob = function(){
     //newJob[DATAVERSION] = DATA_VERSION;
 
     newJob[ISFOLLOWED] = false;
-    newJob[STATUS] = Status.New;
+    newJob[STATUS] = JobStatus.New;
 
     return newJob;
 }
@@ -130,34 +65,26 @@ var AreTwoJobsSameForAttributes = function(job1, job2, attributes){
 
 // this function update the job
 var UpdateJob = function(oldJob, newJob){
-    //var job = CreateNewJob();
-
+    // here are only job keys, not user data keys
     var attributes = [HREF, TITLE, DESCRIPTION, LOCATION, EXPERTISE, WORKTYPE, LEVEL,
         POSTEDDATE, CLOSEDATE, SOURCE];
 
     if (!AreTwoJobsSameForAttributes(oldJob, newJob, attributes)){
-        oldJob[HREF] = newJob[HREF];
-        oldJob[TITLE] = newJob[TITLE];
-        oldJob[DESCRIPTION] = newJob[DESCRIPTION];
-        oldJob[LOCATION] = newJob[LOCATION];
-        oldJob[EXPERTISE] = newJob[EXPERTISE];
-        oldJob[WORKTYPE] = newJob[WORKTYPE];
-        oldJob[LEVEL] = newJob[LEVEL];
-        oldJob[POSTEDDATE] = newJob[POSTEDDATE];
-        oldJob[CLOSEDATE] = newJob[CLOSEDATE];
-        oldJob[SOURCE] = newJob[SOURCE];
-        //job[DATAVERSION] = newJob[DATAVERSION];
-        oldJob[STATUS] = Status.Updated;
+        for (var i = 0; i < attributes.length; i++){
+            oldJob[attributes[i]] = newJob[attributes[i]];
+        }
 
+        oldJob[STATUS] = JobStatus.Updated;
         oldJob[UPDATEDDATE] = newJob[UPDATEDDATE];
     }
-    else
-        oldJob[STATUS] = Status.Old;
+    else{
+        oldJob[STATUS] = JobStatus.Old;
+    }
 
     // don't update isFollowed field
     //oldJob[ISFOLLOWED] = newJob[ISFOLLOWED];
 
-    return job;
+    return oldJob;
 }
 
 // update old jobs and add new jobs
@@ -174,8 +101,24 @@ var GetUpdatedJobs = function(title, newJobs, oldJobs){
         commonjs.forEachTrue(oldJobs, newJob, cmpfunc, function(oldJob){
             jobToAdd = UpdateJob(oldJob, newJob);
         });
+
         // if we can't find the same job, add the new job
-        jobs.push(newJob);
+        jobs.push(jobToAdd);
+    });
+
+    var diff = commonjs.getDiffFrom2ArrayEx(oldJobs, jobs, function(job1, job2){
+        return job1[HREF] == job2[HREF];
+    });
+
+    // find outdated jobs and check if any of them are followed
+    // if find any, add them back and mark them as outdated
+    commonjs.forEach(diff, function(job){
+        if (job[ISFOLLOWED]){
+            console.log('find closed job');
+            console.log(job);
+            job[STATUS] = JobStatus.Closed;
+            jobs.push(job);
+        }
     });
 
     return jobs;
@@ -194,6 +137,19 @@ var SaveNewJobsToLocal = function(){
 
         // update old jobs and add new jobs
         gJobs[title] = GetUpdatedJobs(title, gJobs[title], oldJobs);
+
+        // find out the number of new jobs and displays it
+        for (var i = 0; i < gJobs[title].length; i++){
+            if (gJobs[title][i][STATUS] == JobStatus.New){
+                gNumOfNewJobs++;
+            }
+        }
+        if (gNumOfNewJobs > 0){
+            chrome.browserAction.setBadgeText({text: gNumOfNewJobs.toString()});
+        }
+        else {
+            chrome.browserAction.setBadgeText({text: ''});
+        }
 
         console.log('new jobs');
         console.log(gJobs[title]);
@@ -249,7 +205,9 @@ var parseMercyAscot = function(data){
     var detailProperties = [LOCATION, EXPERTISE, WORKTYPE, LEVEL,
         POSTEDDATE, CLOSEDATE];
 
-    var job = addProperties(job, detailProperties, jobDetails, null);
+    commonjs.forEach(detailProperties, function(property, index){
+        job[property] = jobDetails[index];
+    });
 
     job[SOURCE] = MERCYASCOT;
 
@@ -305,9 +263,18 @@ var parseAdhb = function(data){
             }
         }
 
+        // due some changes on adhb website on 11st July 2016
+        // each job might not always occupy 11 elements
+        // so we need to do some extra works
         var offset = 11;
         for (var i = 0; i < numOfJobsFound; i++){
             var idx = i * offset;
+
+            // before we extract the data, we first check if the 8th element is a href
+            // if not, insert an empty element at 8th position, so each job always occupy 11 elements
+            if (goodData[idx+8].indexOf('http') == 0){
+                goodData.splice(idx+8, 0, '');
+            }
 
             var job = CreateNewJob();
             job[HREF] = goodData[idx+9];
@@ -324,6 +291,7 @@ var parseAdhb = function(data){
             jobs.push(job);
         }
     });
+
     return jobs;
 };
 
@@ -363,9 +331,96 @@ var adhbCmpFunc = function(item1, item2){
     Assert((typeof item1 == 'object' || typeof item2 == 'object'), 'adhbCmpFunc: either item1 (arg) or item (arg) is not object');
     return mercyascotCmpFunc(item1, item2);
 };
+
+//////////////////////////////////////////////////////////////////////////
+
+gUrls[WDHB] = "http://wdhbcareers.co.nz/listings.php?jobNum=&keyWords=&parentCats=200000040&subCats=200000063"
+
+var parseWdhb = function(html){
+    var wdhb = "http://wdhbcareers.co.nz";
+
+    var job = CreateNewJob();
+    var parser = parserjs.CreateParser(html);
+    
+    // get the href
+    parser.Find('a').Index(0).Parse(function(html, attrs, data){
+        job[HREF] = wdhb + attrs['href'];
+        job[TITLE] = html;
+    });
+
+    // get the posted date
+    var jobPosted = 'job posted:';
+    var startIndexOfPostedDate = html.toLowerCase().indexOf(jobPosted);
+    if (startIndexOfPostedDate > -1){
+       var subStr = html.substr(startIndexOfPostedDate); 
+       var endIndexOfPostedDate = subStr.toLowerCase().indexOf('<div');
+
+       // get the start and end index of the posted date
+       endIndexOfPostedDate = startIndexOfPostedDate + endIndexOfPostedDate;
+       startIndexOfPostedDate = startIndexOfPostedDate + jobPosted.length;
+
+       var postedDate = html.substring(startIndexOfPostedDate, endIndexOfPostedDate).trim();
+
+       job[POSTEDDATE] = postedDate;
+       job[SOURCE] = WDHB;
+    }
+
+    return job;
+};
+
+var updateMoreJobInfoThenSave = function(jobs){
+    var jobsDone = 0;
+    commonjs.forEach(jobs, function(job){
+        loader.load(job[HREF], function(html){
+            // replace the new line characters with a space
+            html = html.replace(/(\r|\n|\r\n)/gi, ' ');
+
+            //get the closing date
+            var jobClose = 'closing date:';
+            var startIndexOfCloseDate = html.toLowerCase().search(jobClose);
+            if (startIndexOfCloseDate > -1){
+                var subStr = html.substr(startIndexOfCloseDate);
+                var endIndexOfCloseDate = subStr.indexOf('<');
+
+                // get the start and end index of the close date
+                endIndexOfCloseDate = endIndexOfCloseDate + startIndexOfCloseDate;
+                startIndexOfCloseDate = startIndexOfCloseDate + jobClose.length;
+
+                var closeDate = html.substring(startIndexOfCloseDate, endIndexOfCloseDate).trim().replace(/\s+/, ' ');
+                job[CLOSEDATE] = closeDate;
+            }
+
+            //check if the job is permanent or fixed term
+            var type = '';
+            if (html.toLowerCase().indexOf('fixed') > -1){
+                type = 'Fixed term, ';
+            }
+            else if (html.toLowerCase().indexOf('permanent')){
+                type = 'permanent, ';
+            }
+            var parser = parserjs.CreateParser(html).Find('table[class=jobdetails] td');
+            parser.Index(1).Parse(function(html, attrs, data){
+                type += html.trim();
+            });
+            parser.Index(3).Parse(function(html, attrs, data){
+                type = type + ', ' + html.trim();
+            });
+
+            job[WORKTYPE] = type;
+
+            jobsDone++;
+            if (jobsDone == jobs.length){
+                SaveNewJobs(WDHB, jobs, adhbCmpFunc);
+            }
+        });
+    });
+};
+
 //////////////////////////////////////////////////////////////////////////
 
 var FetchNewJobsFromSources = function(){
+    
+    chrome.browserAction.setBadgeText({text: 'load'});
 	
 	// thread issue with chrome.storage
 	loader.load(gUrls[MERCYASCOT], function(text){
@@ -381,7 +436,6 @@ var FetchNewJobsFromSources = function(){
 	
 	    Assert(newJobs.length > 0, 'ERROR: parse mercyascot website return empty jobs');
 	
-	    //var newJobs = getTestData();
 	    SaveNewJobs(MERCYASCOT, newJobs, mercyascotCmpFunc);
 	});
 	
@@ -409,11 +463,26 @@ var FetchNewJobsFromSources = function(){
 	        });
 	    });
 	});
+
+    loader.load(gUrls[WDHB], function(text){
+        Assert(text.length > 0, 'ERROR: load for wdhb url return empty string');
+
+        var jobs = [];
+        var parser = parserjs.CreateParser(text);
+        parser.Find('div[id=page_container] div[class=listing]').Parse(function(html, attrs, data){
+            var job = parseWdhb(html);
+            jobs.push(job);
+        });
+
+        updateMoreJobInfoThenSave(jobs);
+    });
 }
 
 //jobscontrollerjs.deleteAll();
 
 FetchNewJobsFromSources();
+
+//chrome.browserAction.setBadgeText({text: '10'});
 
 //////////////////////////////////////////////////////////////////////////
 
