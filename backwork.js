@@ -28,10 +28,36 @@ var gNumOfNewJobs = 0;
 var gUrls = {};
 var loader = new UrlLoader();
 
-var supportedSources = [MERCYASCOT, ADHB, WDHB];
+//var supportedSources = [MERCYASCOT, ADHB, WDHB];
+var supportedSources = [MERCYASCOT];
+
+var _createNewJob = function(oldJob){
+    var newJob = {};
+
+    newJob[HREF] = oldJob[HREF] || "";
+    newJob[TITLE] = oldJob[TITLE] || "";
+    newJob[DESCRIPTION] = oldJob[DESCRIPTION] || "";
+    newJob[LOCATION] = oldJob[LOCATION] || "";
+    newJob[EXPERTISE] = oldJob[EXPERTISE] || "";
+    newJob[WORKTYPE] = oldJob[WORKTYPE] || "";
+    newJob[LEVEL] = oldJob[LEVEL] || "";
+    newJob[POSTEDDATE] = oldJob[POSTEDDATE] || "";
+    newJob[CLOSEDATE] = oldJob[CLOSEDATE] || "";
+    newJob[UPDATEDDATE] = oldJob[UPDATEDDATE] || (new Date()).toDateString();
+    newJob[SOURCE] = oldJob[SOURCE] || "";
+    //newJob[DATAVERSION] = DATA_VERSION;
+
+    newJob[ISFOLLOWED] = oldJob[ISFOLLOWED] || false;
+    newJob[STATUS] = oldJob[STATUS] || JobStatus.New;
+
+    return newJob;
+};
 
 // this create a new job
 var CreateNewJob = function(){
+    var newJob = _createNewJob({});
+    return newJob;
+    /*
     var newJob = {};
 
     newJob[HREF] = "";
@@ -51,7 +77,13 @@ var CreateNewJob = function(){
     newJob[STATUS] = JobStatus.New;
 
     return newJob;
+    */
 }
+
+var CreateNewJobFromExistingJob = function(oldJob){
+    var newJob = _createNewJob(oldJob);
+    return newJob;
+};
 
 var AreTwoJobsSameForAttributes = function(job1, job2, attributes){
     for (var i = 0; i < attributes.length; i++){
@@ -420,8 +452,9 @@ var updateMoreJobInfoThenSave = function(jobs){
 
 var FetchNewJobsFromSources = function(){
     
-    chrome.browserAction.setBadgeText({text: 'load'});
+    //chrome.browserAction.setBadgeText({text: 'load'});
 	
+    /*
 	// thread issue with chrome.storage
 	loader.load(gUrls[MERCYASCOT], function(text){
 	
@@ -437,8 +470,58 @@ var FetchNewJobsFromSources = function(){
 	    Assert(newJobs.length > 0, 'ERROR: parse mercyascot website return empty jobs');
 	
 	    SaveNewJobs(MERCYASCOT, newJobs, mercyascotCmpFunc);
-	});
+	});*/
+
+    var queryMercyAscot = "from 'https://careers.mercyascot.co.nz/home'\n" +
+            "select 'div[class=job]' as rets\n" +
+            "where-each as ret\n" +
+            "from ret.html\n" +
+            "select 'div[class=title] a' as href\n" +
+            "add-field href.attrs.href for-key '" + HREF + "'\n" +
+            "and\n" +
+            "from ret.html\n" +
+            "select 'div[class=title] a span' as title\n" +
+            "add-field title.html for-key '" + TITLE + "'\n" +
+            "and\n" +
+            "from ret.html\n" +
+            "select 'div[class=description]' as description\n" +
+            "add-field description.html for-key '" + DESCRIPTION + "'\n" +
+            "and\n" +
+            "from ret.html\n" +
+
+            "select 'span[class=detail-item]' as [" + LOCATION + ', ' + EXPERTISE + ', ' + WORKTYPE + ', ' + LEVEL + ', ' + POSTEDDATE + ', ' + CLOSEDATE + "]\n" +
+            "where-each as detail\n" +
+            "add-field detail.html for-key detail.$Name;";
+
+    var jobs = [];
+    queryparserjs.InterpretEx(queryMercyAscot, 
+            {
+                forEach : function(ret){
+                    var properties = [LOCATION, EXPERTISE, WORKTYPE, LEVEL,
+                        POSTEDDATE, CLOSEDATE];
+
+                    commonjs.forEach(properties, function(property){
+                        var data = ret[property].split('</span>');
+                        ret[property] = data[data.length-1];
+                    });
+
+                    ret[HREF] = 'https://careers.mercyascot.co.nz/' + ret[HREF];
+                    ret[SOURCE] = MERCYASCOT;
+
+                    var job = CreateNewJobFromExistingJob(ret);
+                    jobs.push(job);
+                },
+                whenAllFinish : function(){
+	                SaveNewJobs(MERCYASCOT, jobs, mercyascotCmpFunc);
+                }
+            }
+    );
+
+
+
+
 	
+    /*
 	loader.load(gUrls[ADHB], function(text){
 	
 	    Assert(text.length > 0, 'ERROR: load for adhb url return empty string');
@@ -476,6 +559,7 @@ var FetchNewJobsFromSources = function(){
 
         updateMoreJobInfoThenSave(jobs);
     });
+    */
 }
 
 //jobscontrollerjs.deleteAll();
