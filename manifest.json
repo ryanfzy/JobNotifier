@@ -16,6 +16,7 @@
             "lib/common.js",
             "lib/parser.js",
             "lib/urlloader.js",
+            "lib/queryparser.js",
             "jobscontroller.js",
             "backwork.js"
         ]

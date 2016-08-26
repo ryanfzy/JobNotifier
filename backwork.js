@@ -28,8 +28,8 @@ var gNumOfNewJobs = 0;
 var gUrls = {};
 var loader = new UrlLoader();
 
-//var supportedSources = [MERCYASCOT, ADHB, WDHB];
-var supportedSources = [MERCYASCOT];
+var supportedSources = [MERCYASCOT, ADHB, WDHB];
+//var supportedSources = [MERCYASCOT];
 
 var _createNewJob = function(oldJob){
     var newJob = {};
@@ -298,7 +298,7 @@ var parseAdhb = function(data){
         // due some changes on adhb website on 11st July 2016
         // each job might not always occupy 11 elements
         // so we need to do some extra works
-        var offset = 11;
+        var offset = 12;
         for (var i = 0; i < numOfJobsFound; i++){
             var idx = i * offset;
 
@@ -307,17 +307,21 @@ var parseAdhb = function(data){
             if (goodData[idx+8].indexOf('http') == 0){
                 goodData.splice(idx+8, 0, '');
             }
+            // same reason as above for the 2nd element
+            if (goodData[idx+2].indexOf('CEN') == -1){
+                goodData.splice(idx+2, 0, '');
+            }
 
             var job = CreateNewJob();
-            job[HREF] = goodData[idx+9];
+            job[HREF] = goodData[idx+10];
             job[TITLE] = goodData[idx];
             job[DESCRIPTION] = goodData[idx+1];
-            job[LOCATION] = goodData[idx+6] + ', ' + goodData[idx+5];
-            job[EXPERTISE] = goodData[idx+4];
-            job[WORKTYPE] = goodData[idx+7] + '(' + goodData[idx+8] + ')';
+            job[LOCATION] = goodData[idx+7] + ', ' + goodData[idx+6];
+            job[EXPERTISE] = goodData[idx+5];
+            job[WORKTYPE] = goodData[idx+8] + '(' + goodData[idx+9] + ')';
             job[LEVEL] = job[EXPERTISE];
-            job[POSTEDDATE] = goodData[idx+2];
-            job[CLOSEDATE] = goodData[idx+3];
+            job[POSTEDDATE] = goodData[idx+3];
+            job[CLOSEDATE] = goodData[idx+4];
 
             job[SOURCE] = ADHB;
             jobs.push(job);
@@ -452,9 +456,8 @@ var updateMoreJobInfoThenSave = function(jobs){
 
 var FetchNewJobsFromSources = function(){
     
-    //chrome.browserAction.setBadgeText({text: 'load'});
+    chrome.browserAction.setBadgeText({text: 'load'});
 	
-    /*
 	// thread issue with chrome.storage
 	loader.load(gUrls[MERCYASCOT], function(text){
 	
@@ -470,8 +473,9 @@ var FetchNewJobsFromSources = function(){
 	    Assert(newJobs.length > 0, 'ERROR: parse mercyascot website return empty jobs');
 	
 	    SaveNewJobs(MERCYASCOT, newJobs, mercyascotCmpFunc);
-	});*/
+	});
 
+    /*
     var queryMercyAscot = "from 'https://careers.mercyascot.co.nz/home'\n" +
             "select 'div[class=job]' as rets\n" +
             "where-each as ret\n" +
@@ -517,11 +521,17 @@ var FetchNewJobsFromSources = function(){
             }
     );
 
+    var adhbQuery = "from 'https://adhbrac.taleo.net/careersection/adhb_clinical/jobsearch.ftl?lang=en&amp;jobfield=200000063&dropListSize=100#mainContent'\n" +
+                    "select 'input[name=initialHistory]' as raw\n" +
+                    "add-field raw.attrs.value for-key 'rawOutput';"
 
-
-
+    queryparserjs.Interpret(adhbQuery, function(rets){
+            console.log('here');
+            console.log(rets);
+        //var newJobs = parseAdhb(rets[0].rawOutput);
+        //UpdateWorkTypeForAdhbJobsThenSave(newJobs);
+    });*/
 	
-    /*
 	loader.load(gUrls[ADHB], function(text){
 	
 	    Assert(text.length > 0, 'ERROR: load for adhb url return empty string');
@@ -559,7 +569,6 @@ var FetchNewJobsFromSources = function(){
 
         updateMoreJobInfoThenSave(jobs);
     });
-    */
 }
 
 //jobscontrollerjs.deleteAll();
